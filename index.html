@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burnroom</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.70.1/lib/index.iife.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'SF Mono', Consolas, monospace;
+            background: #000;
+            color: #fff;
+            line-height: 1.4;
+            overflow-x: hidden;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #333;
+            z-index: 100;
+            padding: 15px 0;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+
+
+
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: #ccc;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: #fff; }
+
+        .connect-wallet {
+            background: transparent;
+            border: 1px solid #666;
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .connect-wallet:hover {
+            background: #222;
+        }
+
+        .connect-wallet.connected {
+            background: #0f0;
+            color: #000;
+            border-color: #0f0;
+        }
+
+        /* Main */
+        main {
+            padding-top: 80px;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 40px;
+            align-items: start;
+        }
+
+        .content {
+            padding: 15px 0;
+            position: relative;
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+
+        h1 {
+            font-size: 72px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            color: #fff;
+            letter-spacing: -2px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #888;
+            margin-bottom: 40px;
+            max-width: 500px;
+        }
+
+        .experiment-rules {
+            margin-bottom: 40px;
+        }
+
+        .rule {
+            display: flex;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .rule-num {
+            color: #666;
+            margin-right: 15px;
+            width: 20px;
+        }
+
+        .rule-text {
+            color: #ccc;
+            flex: 1;
+        }
+
+        /* Chart */
+        .chart-container {
+            margin: 40px 0;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            height: 400px;
+        }
+
+        .chart-title {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 12px;
+            color: #666;
+            z-index: 1;
+        }
+
+        .user-position {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 12px;
+            color: #0f0;
+            z-index: 1;
+        }
+
+        #priceChart {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            right: 20px;
+            bottom: 50px;
+        }
+
+        /* Trading Panel */
+        .trading-panel {
+            position: sticky;
+            top: 100px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+        }
+
+        .price {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .price-change {
+            font-size: 14px;
+            color: #0f0;
+            margin-bottom: 30px;
+        }
+
+        .price-change.negative {
+            color: #f00;
+        }
+
+        .stats {
+            margin-bottom: 30px;
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .stat-label { color: #666; }
+        .stat-value { color: #fff; }
+
+        .wallet-status {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0f0;
+        }
+
+        .indicator-dot.locked { background: #f00; }
+
+        .countdown {
+            color: #f90;
+            font-weight: 600;
+        }
+
+        .trade-btn {
+            width: 100%;
+            padding: 15px;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .trade-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .trade-btn:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .sell-btn {
+            background: #333;
+            color: #666;
+        }
+
+        .warning {
+            font-size: 11px;
+            color: #f90;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .migration-warning {
+            color: #f00;
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Alarm */
+        .alarm {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.1);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: flash 0.3s infinite;
+        }
+
+        @keyframes flash {
+            0%, 100% { background: rgba(255, 0, 0, 0.1); }
+            50% { background: rgba(255, 0, 0, 0.2); }
+        }
+
+        .alarm-msg {
+            background: #f00;
+            color: #fff;
+            padding: 20px 40px;
+            border-radius: 4px;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        /* Contract */
+        .contract {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #333;
+        }
+
+        .contract-addr {
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .trading-panel {
+                position: static;
+                margin-top: 30px;
+            }
+            
+            h1 { font-size: 48px; }
+            .nav-links { display: none; }
+        }
+.token-logo {
+    width: 200px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; /* Ensures the image stays within the circular boundary */
+}
+
+.token-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures the image covers the space without distortion */
+}
+    </style>
+</head>
+<body>
+    <div class="alarm" id="alarm">
+        <div class="alarm-msg">SELL ATTEMPT DETECTED<br>ALL TOKENS BURNED</div>
+    </div>
+
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <span>Burnroom</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="https://x.com/lock_experiment">@BurnroomSolana</a></li>
+                <li><a href="#chart">CHART</a></li>
+                <li><button class="connect-wallet" id="connectWallet">CONNECT WALLET</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container">
+        <main>
+            <div class="content">
+                <div class="content-header">
+                    <div>
+                        <h1>$BURNROOM</h1>
+                        <p class="subtitle">
+                            Irreversible trading experiment. Buy once, locked forever. 
+                            Every 30 seconds, attempted sells result in total token burn.
+                        </p>
+                    </div>
+<div class="token-logo">
+  <img src="logo.png" alt="Token Logo">
+</div>                </div>
+
+                <div class="experiment-rules">
+                    <div class="rule">
+                        <span class="rule-num">01</span>
+                        <span class="rule-text">Each wallet can only buy once. After purchase, permanently locked from trading.</span>
+                    </div>
+                    <div class="rule">
+                        <span class="rule-num">02</span>
+                        <span class="rule-text">Choose: trade normally or lock tokens for exclusive airdrops.</span>
+                    </div>
+                    <div class="rule">
+                        <span class="rule-num">03</span>
+                        <span class="rule-text">Alarm system triggers every 30 seconds. Selling during alarm = total loss.</span>
+                    </div>
+                    <div class="rule">
+                        <span class="rule-num">04</span>
+                        <span class="rule-text">Price rises as everyone holds. Psychological endurance test.</span>
+                    </div>
+                </div>
+
+                <div class="chart-container" id="chart">
+                    <div class="chart-title">$BURNROOM PRICE CHART</div>
+                    <div class="user-position" id="userPosition"></div>
+                    <canvas id="priceChart"></canvas>
+                </div>
+
+                <div class="contract" id="contract">
+                    <h3 style="margin-bottom: 10px; font-size: 16px;">CONTRACT</h3>
+                    <div class="contract-addr">Contract address will be displayed here</div>
+                </div>
+            </div>
+
+            <div class="trading-panel">
+                <div class="price" id="price">$0.0040</div>
+                <div class="price-change" id="priceChange">+0.0% (24h)</div>
+                <div class="migration-warning" id="migrationWarning">MIGRATION REQUIRED AT $0.0070</div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Market Cap</span>
+                        <span class="stat-value" id="mcap">$4K</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Locked Wallets</span>
+                        <span class="stat-value" id="locked">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Your Position</span>
+                        <span class="stat-value" id="positionStat">-</span>
+                    </div>
+                </div>
+
+                <div class="wallet-status">
+                    <div class="status-indicator">
+                        <div class="indicator-dot" id="indicator"></div>
+                        <span id="status">WALLET UNLOCKED</span>
+                    </div>
+                    <div style="font-size: 11px; color: #666;">
+                        Next alarm: <span class="countdown" id="countdown">00:30</span>
+                    </div>
+                </div>
+
+                <button class="trade-btn" id="buyBtn" onclick="buy()">
+                    BUY & BURN FOREVER
+                </button>
+                <button class="trade-btn sell-btn" id="sellBtn" onclick="sell()" disabled>
+                    SELL (LOCKED)
+                </button>
+
+                <div class="warning">
+                    ⚠️ IRREVERSIBLE ACTION<br>
+                    Once purchased, wallet permanently locked
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initial state
+        let walletLocked = false;
+        let price = 0.0040;
+        let countdown = 30;
+        let lockedCount = 0;
+        let priceHistory = [];
+        let userBuyPrice = null;
+        let walletConnected = false;
+        let chart;
+        let lastUpdateTime = Date.now();
+        let priceChange24h = 0;
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            // Generate initial price history
+            const now = Date.now();
+            for (let i = 0; i < 100; i++) {
+                priceHistory.push({
+                    x: now - (100 - i) * 60000,
+                    y: 0.0035 + Math.random() * 0.001
+                });
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Price',
+                        data: priceHistory,
+                        borderColor: '#0f0',
+                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'minute',
+                                displayFormats: {
+                                    minute: 'HH:mm'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#666'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#666',
+                                callback: function(value) {
+                                    return '$' + value.toFixed(4);
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return '$' + context.parsed.y.toFixed(4);
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // Update price and chart
+        function updatePrice() {
+            const now = Date.now();
+            
+            // Calculate price movement - more volatile and faster
+            const volatility = 0.0005 + (Math.random() * 0.001); // Increased volatility
+            const direction = Math.random() > 0.45 ? 1 : -1; // Slight upward bias
+            const priceMovement = direction * volatility + (lockedCount * 0.00001);
+            price += priceMovement;
+            
+            // Ensure price doesn't go below 0.001
+            price = Math.max(0.001, price);
+            
+            // Add to price history
+            priceHistory.push({
+                x: now,
+                y: price
+            });
+            
+            // Keep only last 200 data points for smoother chart
+            if (priceHistory.length > 200) {
+                priceHistory.shift();
+            }
+            
+            // Update chart with faster animation
+            if (chart) {
+                chart.data.datasets[0].data = priceHistory;
+                chart.update('none'); // No animation for fastest updates
+            }
+            
+            // Update DOM elements
+            document.getElementById('price').textContent = `$${price.toFixed(4)}`;
+            
+            // Calculate market cap (assuming 1M total supply)
+            const marketCap = price * 1000000;
+            document.getElementById('mcap').textContent = `$${Math.floor(marketCap / 1000)}K`;
+            
+            // Check for migration warning at $0.0070
+            if (price >= 0.0070) {
+                document.getElementById('migrationWarning').style.display = 'block';
+            }
+            
+            // Update 24h price change
+            if (priceHistory.length > 1) {
+                const oldPrice = priceHistory[Math.max(0, priceHistory.length - 50)].y;
+                priceChange24h = ((price - oldPrice) / oldPrice) * 100;
+                const priceChangeElement = document.getElementById('priceChange');
+                priceChangeElement.textContent = `${priceChange24h >= 0 ? '+' : ''}${priceChange24h.toFixed(1)}% (24h)`;
+                priceChangeElement.className = priceChange24h >= 0 ? 'price-change' : 'price-change negative';
+            }
+            
+            lastUpdateTime = now;
+        }
+
+        function updateCountdown() {
+            countdown -= 0.1; // Decrease by 0.1 seconds for smoother countdown
+            if (countdown <= 0) {
+                countdown = 30;
+                if (Math.random() < 0.3) checkAlarm(); // Higher chance of alarm
+            }
+            document.getElementById('countdown').textContent = 
+                `00:${Math.max(0, countdown).toFixed(1).padStart(4, '0')}`;
+        }
+
+        function updateStats() {
+            // Simulate new users joining more frequently
+            if (Math.random() < 0.7) { // Higher chance
+                lockedCount += Math.floor(Math.random() * 3) + 1; // More users at once
+                document.getElementById('locked').textContent = lockedCount.toLocaleString();
+            }
+            
+            // Update user position if they've bought
+            if (userBuyPrice !== null) {
+                const positionPercentage = ((price - userBuyPrice) / userBuyPrice) * 100;
+                document.getElementById('positionStat').textContent = `${positionPercentage >= 0 ? '+' : ''}${positionPercentage.toFixed(1)}%`;
+                document.getElementById('userPosition').textContent = `YOUR ENTRY: $${userBuyPrice.toFixed(4)} (${positionPercentage >= 0 ? '+' : ''}${positionPercentage.toFixed(1)}%)`;
+            }
+        }
+
+        function buy() {
+            if (!walletConnected) {
+                alert('Please connect your wallet first');
+                return;
+            }
+            
+            if (walletLocked) {
+                alert('Wallet already locked from trading $BURNROOM');
+                return;
+            }
+            
+            if (confirm('WARNING: This permanently locks your wallet from trading $BURNROOM. Continue?')) {
+                walletLocked = true;
+                userBuyPrice = price;
+                document.getElementById('indicator').classList.add('locked');
+                document.getElementById('status').textContent = 'WALLET LOCKED';
+                document.getElementById('buyBtn').disabled = true;
+                document.getElementById('buyBtn').textContent = 'PERMANENTLY LOCKED';
+                document.getElementById('sellBtn').disabled = false;
+                document.getElementById('sellBtn').textContent = 'ATTEMPT SELL';
+                
+                // Add to locked count
+                lockedCount++;
+                document.getElementById('locked').textContent = lockedCount.toLocaleString();
+                
+                // Update position stats
+                updateStats();
+            }
+        }
+
+        function sell() {
+            if (!walletLocked) return;
+            checkAlarm();
+        }
+
+        function checkAlarm() {
+            const alarm = document.getElementById('alarm');
+            alarm.style.display = 'flex';
+            setTimeout(() => {
+                alarm.style.display = 'none';
+                if (walletLocked) {
+                    alert('All $BURNROOM tokens burned due to sell attempt during alarm.');
+                    // Reset user position
+                    userBuyPrice = null;
+                    document.getElementById('positionStat').textContent = '-';
+                    document.getElementById('userPosition').textContent = '';
+                }
+            }, 2000);
+        }
+
+        // Connect wallet function
+        async function connectWallet() {
+            try {
+                // Check for various Solana wallets
+                if (typeof window.solana !== 'undefined' && window.solana.isPhantom) {
+                    const response = await window.solana.connect();
+                    const publicKey = response.publicKey.toString();
+                    console.log('Connected with Phantom:', publicKey);
+                    walletConnected = true;
+                    const btn = document.getElementById('connectWallet');
+                    btn.textContent = 'CONNECTED';
+                    btn.classList.add('connected');
+                } else if (typeof window.solflare !== 'undefined') {
+                    await window.solflare.connect();
+                    walletConnected = true;
+                    const btn = document.getElementById('connectWallet');
+                    btn.textContent = 'CONNECTED';
+                    btn.classList.add('connected');
+                } else {
+                    // Simulate connection for demo purposes
+                    walletConnected = true;
+                    const btn = document.getElementById('connectWallet');
+                    btn.textContent = 'CONNECTED (lockexperiment)';
+                    btn.classList.add('connected');
+                    console.log('No Solana wallet detected - running in demo mode');
+                }
+            } catch (err) {
+                console.error('Error connecting wallet:', err);
+                alert('Error connecting wallet. Please try again.');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing LOCK trading interface...');
+            
+            // Initialize chart
+            setTimeout(() => {
+                initChart();
+                console.log('Chart initialized');
+            }, 100);
+            
+            // Set up intervals - much faster updates
+            setInterval(updatePrice, 500);    // Update price every 0.5 seconds
+            setInterval(updateCountdown, 100); // Update countdown every 0.1 seconds
+            setInterval(updateStats, 1000);   // Update stats every second
+            
+            // Connect wallet button
+            document.getElementById('connectWallet').addEventListener('click', connectWallet);
+            
+            console.log('LOCK interface ready!');
+        });
+    </script>
+</body>
+</html>
